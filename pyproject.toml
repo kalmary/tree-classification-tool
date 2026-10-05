@@ -1,0 +1,29 @@
+[project]
+name = "tree-classification-tool"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "laspy>=2.7.0",
+    "laszip>=0.3.0",
+    "lazrs>=0.8.2",
+    "numpy>=2.5.3",
+    "pathlib>=1.0.1",
+    "pyproj>=3.6.1",
+]
+
+[dependency-groups]
+test = [
+    "pytest>=9.1.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tree_classification"]
+
+[tool.pytest.ini_options]
+python_files = ["*.py"]

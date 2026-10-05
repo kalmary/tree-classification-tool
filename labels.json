@@ -1,0 +1,78 @@
+{
+  "-2": {
+    "latin": "Unclassified",
+    "polish": "Nieklasyfikowane"
+  },
+  "0": {
+    "latin": "Pinus",
+    "polish": "sosna"
+  },
+  "1": {
+    "latin": "Picea",
+    "polish": "świerk"
+  },
+  "2": {
+    "latin": "Abies",
+    "polish": "jodła"
+  },
+  "3": {
+    "latin": "Larix",
+    "polish": "modrzew"
+  },
+  "4": {
+    "latin": "Pseudotsuga",
+    "polish": "daglezja"
+  },
+  "5": {
+    "latin": "Quercus",
+    "polish": "dąb"
+  },
+  "6": {
+    "latin": "Ulmus",
+    "polish": "wiąz"
+  },
+  "7": {
+    "latin": "Fagus",
+    "polish": "buk"
+  },
+  "8": {
+    "latin": "Tilia",
+    "polish": "lipa"
+  },
+  "9": {
+    "latin": "Carpinus",
+    "polish": "grab"
+  },
+  "10": {
+    "latin": "Acer",
+    "polish": "klon"
+  },
+  "11": {
+    "latin": "Fraxinus",
+    "polish": "jesion"
+  },
+  "12": {
+    "latin": "Betula",
+    "polish": "brzoza"
+  },
+  "13": {
+    "latin": "Corylus",
+    "polish": "leszczyna"
+  },
+  "14": {
+    "latin": "Crataegus",
+    "polish": "głóg"
+  },
+  "15": {
+    "latin": "Incorrect segmentation",
+    "polish": "Błędna segmentacja"
+  },
+  "16": {
+    "latin": "Others",
+    "polish": "Inne"
+  },
+  "17": {
+    "latin": "Shrub",
+    "polish": "krzew"
+  }
+}
