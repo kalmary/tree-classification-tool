@@ -1,0 +1,35 @@
+Phase 3 is done and verified. Tree contains only the four intended files; .venv/.pytest_cache are gitignored, no stray artifacts (§138).
+
+What was built
+
+src/tree_classification/rendering/depth_map.py — DepthMapRenderer implementing the Renderer protocol, with the workplan's cloud2sideView transcribed faithfully: cube fitting with margin_ratio, to_grid rasterisation, scatter_reduce(reduce="amin") for nearest-surface selection, and the five views in the spec's order (VIEW_NAMES = top, front, back, left, right) with their flip_x/flip_y wiring unchanged.
+
+Device comes from the constructor (torch.device(device)), so the cpu|cuda CLI argument needs no branching anywhere else.
+
+Verification
+
+pytest src/tree_classification/rendering/depth_map.py -v   →  6 passed
+pytest src/                                                →  10 passed
+
+The committed test_depth_map_renderer passes byte-for-byte unmodified — I deliberately didn't touch it, so there's no question of having bent the spec to fit the code (§107). Five tests added in-file (§143): default resolution, depth range endpoints, RGB nearest-colour selection, and front/back plus left/right mirroring (these two catch flip_x wiring, which a shape-only test misses).
+
+Beyond the suite, I checked CPU/CUDA parity directly, since this machine has a working GPU (2.14.1+cu130, cuda: True):
+
+grayscale: cpu==cuda: True     (5000 points, 256×256, bit-identical)
+rgb:       cpu==cuda: True
+
+That isn't a committed test — it would silently skip on CPU-only machines, so it adds review surface for little value. Flagging it as verified-by-hand rather than covered (§122).
+
+Two decisions you should know about
+
+1. RGB views are (H, W, 3); grayscale stay (H, W). This contradicts the option A I recommended last turn. Reason: the committed test asserts view.shape == (64, 64), which fixes the grayscale contract at 2D — honouring it was worth more than shape uniformity. So phase 4's pdf_writer needs the ndim branch (option B). One line: np.stack([v] * 3, axis=-1) when v.ndim == 2.
+
+2. RGB replaces the depth shade entirely — a coloured pixel is the nearest point's raw colour, not that colour dimmed by distance. That's the literal reading of workplan p.4 ("the rgb values are used to colour the depth maps instead"), and it keeps species colour undistorted for the human classifier. The cost is that RGB views lose the depth cue that makes grayscale views readable as 3D. If you'd rather keep shading, it's colours[visible] * shade[visible, None] — say the word.
+
+One deliberate deviation from the phase-1 contract: render's resolution is int | None = None (None → the configured resolution) rather than the protocol's int = 256. Both the constructor and render carry resolution because the committed test passes it to both; a sentinel is the only honest way to say "use my configured value". This widens the accepted input, so any protocol-typed caller passing an int is unaffected.
+
+Not done, on purpose
+
+- No repo-wide bare pytest. pytest src/ is the entire real suite (no tests/ dir yet); bare pytest adds only test_sandbox.py, the side-effecting script from earlier that rewrites test_sandbox.las. That's the unrelated pre-existing defect, left for separate treatment per §96.
+- No integration test in tests/. Phase 3 has no cross-module seam yet — reader→extraction→renderer wiring is phase 5, which is also where the architecture doc puts it (step 12).
+- _box_cloud() duplicates the box literal inside the untouched committed test. Deduping means editing that test, which I avoided for the reason above. Happy to clean it up if you'd rather have it tidy.
