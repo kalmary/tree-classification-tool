@@ -332,7 +332,7 @@ Implements `ReportWriter`. One PDF page per tree: row 1 = 3 images, row 2 = 2 im
 Reads PDF pages via `PyMuPDF` (`fitz`). Returns page images as numpy arrays.
 
 #### [NEW] `csv_store.py`
-Implements `LabelStore`. CSV with columns: `tree_id, lat, long, height, source_tree_id, label`.
+Implements `LabelStore`. CSV with columns: `tree_id, latitude, longitude, height, source_tree_id, label` (identical to `TreeLabel` field names).
 
 ---
 
