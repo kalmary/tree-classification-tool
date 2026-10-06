@@ -179,3 +179,21 @@ def test_left_and_right_views_are_mirrored():
     *_, left, right = renderer.render(points)
 
     assert np.array_equal(left, np.fliplr(right))
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is not available")
+def test_gpu_render_matches_cpu():
+    rng = np.random.default_rng(0)
+    points = rng.uniform(-5.0, 5.0, size=(2000, 3))
+    rgb = rng.integers(0, 256, size=(2000, 3), dtype=np.uint8)
+    cpu = DepthMapRenderer(device="cpu", resolution=32)
+    gpu = DepthMapRenderer(device="cuda", resolution=32)
+
+    for colours in (None, rgb):
+        cpu_views = cpu.render(points, rgb=colours)
+        gpu_views = gpu.render(points, rgb=colours)
+
+        for name, cpu_view, gpu_view in zip(VIEW_NAMES, cpu_views, gpu_views):
+            assert isinstance(gpu_view, np.ndarray), f"View {name} is not on the host"
+            assert gpu_view.dtype == np.float32
+            np.testing.assert_allclose(gpu_view, cpu_view, err_msg=f"View {name} differs")
