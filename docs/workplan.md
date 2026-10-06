@@ -110,7 +110,7 @@ for tree_id in numpy.unique(tree_ids):
       - original_filename_tree_id - text formatted like this with proper data included
   6. all images/ pdf pages are saved into single pdf file: original_laz_filename_trees_report.pdf - change text to proper data. one laz file with mulitple trees -> one file with, multiple pdf pages
   7. alongside pdf report, csv sheet is created and appended with tree data for each pdf page:
-   - tree_id, latitude, longitude, height, source_tree_id, label (last field set as -2; column names match `TreeLabel` fields)
+   - tree_id, lat, longt, height, original_filename_tree_id, label (last field set as -2)
    - one laz file with multiple trees -> one csv sheet with multiple rows
   8. alongside pdf report, separate tree pcds are saved as .laz/ .las (Same format as the original file). fields should be:
     - xyz points
