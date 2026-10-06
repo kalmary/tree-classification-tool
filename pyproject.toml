@@ -5,17 +5,20 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "fpdf2>=2.8.9",
     "laspy>=2.7.0",
     "laszip>=0.3.0",
     "lazrs>=0.8.2",
     "numpy>=2.5.3",
     "pathlib>=1.0.1",
+    "pillow>=12.3.0",
     "pyproj>=3.6.1",
     "torch>=2.14.1",
 ]
 
 [dependency-groups]
 test = [
+    "pymupdf>=1.28.2",
     "pytest>=9.1.1",
 ]
 
