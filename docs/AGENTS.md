@@ -36,7 +36,7 @@ Build a CLI application for manual point-cloud tree classification. The applicat
 **GUI requirements:**
 - One tab per PDF page showing the rendered tree images and metadata.
 - Controls: **Next**, **Previous**, **Save and Quit** buttons.
-- Label input field accepting: integer values, Latin text, Polish text, and a dropdown (`lista rozwijana`) — all in a single combined widget.
+- Label is chosen with buttons showing the Polish species names from `labels.json`, placed under the page view (no text input). **Next** is enabled once a label is selected.
 - **Next** saves the current label to the CSV and advances.
 - **Previous** discards any unsaved label change and goes back.
 - **Save and Quit** saves the current label and exits.

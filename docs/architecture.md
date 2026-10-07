@@ -118,7 +118,7 @@ tree-classification-tool/
 │       ├── gui/                      # Layer 3: PySide6 GUI (thin presentation)
 │       │   ├── __init__.py
 │       │   ├── app.py                # Main QMainWindow — consumes ClassificationService
-│       │   └── widgets.py            # LabelCombobox, PdfPageViewer
+│       │   └── widgets.py            # LabelButtons, PageViewer
 │       └── cli/                      # Layer 3: CLI entry points
 │           ├── __init__.py
 │           ├── preprocess.py         # argparse CLI for pipeline 1
@@ -280,6 +280,11 @@ class LabelStore(Protocol):
     def read_labels(self, path: Path) -> list[TreeLabel]: ...
     def write_labels(self, labels: list[TreeLabel], path: Path) -> None: ...
     def update_label(self, path: Path, index: int, label: int) -> None: ...
+
+@runtime_checkable
+class PageReader(Protocol):
+    def page_count(self, path: Path) -> int: ...
+    def render_page(self, path: Path, index: int, dpi: int = 100) -> NDArray[np.uint8]: ...
 ```
 
 > [!NOTE]
@@ -475,7 +480,8 @@ class ClassificationGUI(QMainWindow):
 
     def _build_ui(self) -> None:
         # Upper: PDF page image (QLabel/QGraphicsView)
-        # Lower: [Previous] [Next] [Save & Quit] + LabelCombobox
+        # Middle: LabelButtons (Polish names)
+        # Lower: status + [Previous] [Next] [Save and Quit]
         ...
 
     def _on_next(self) -> None:
@@ -498,8 +504,8 @@ def run_app(service: ClassificationService) -> None:
 ```
 
 #### [NEW] `src/tree_classification/gui/widgets.py`
-- `LabelCombobox` — `QComboBox` with pre-populated common labels, free-text input (int, Latin, Polish).
-- `PdfPageViewer` — displays a numpy image array in a `QLabel` (by converting via QImage).
+- `LabelButtons` — one checkable button per labels.json entry (Polish name), at most one selected; no text input. Next is enabled once a label is selected.
+- `PageViewer` — displays a numpy RGB image in a `QLabel` (via QImage), scaled to the widget with kept aspect ratio.
 
 ---
 
