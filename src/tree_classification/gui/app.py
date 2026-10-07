@@ -37,6 +37,7 @@ class ClassificationWindow(QMainWindow):
         self.class_input.setFixedWidth(60)
         self.status = QLabel()
         self.map_link = QLabel()
+        self.map_link.setStyleSheet("font-size: 14pt;")
         self.map_link.setOpenExternalLinks(True)
         self.map_link.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
         # Keeps keyboard focus in the class number input.
