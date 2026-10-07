@@ -85,7 +85,10 @@ class ClassificationWindow(QMainWindow):
             f"{tree.source_tree_id} · tree {self.service.current_index + 1}/{self.service.total_pages}"
             f" · file {self._file_index + 1}/{len(self.services)}"
         )
-        self.map_link.setText(f'<a href="{self.service.current_map_url}">Google Maps</a>')
+        self.map_link.setText(
+            f'<a href="{self.service.current_map_url}">Google Maps</a>'
+            f' · <a href="{self.service.current_bdl_url}">BDL</a>'
+        )
         self._update_controls()
 
     def _update_controls(self) -> None:
@@ -302,6 +305,7 @@ def test_map_link_points_to_current_tree(tmp_path):
     window.label_buttons.button(1).click()
     window.next_button.click()
     assert "query=52.000000,22.000000" in window.map_link.text()
+    assert "location=22.000000,52.000000" in window.map_link.text()
 
     window.label_buttons.button(1).click()
     window.next_button.click()

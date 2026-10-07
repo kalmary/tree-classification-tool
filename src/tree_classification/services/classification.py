@@ -11,6 +11,8 @@ from tree_classification.services.preprocessing import UNCLASSIFIED_LABEL
 
 REPORT_SUFFIX = "_trees_report"
 GOOGLE_MAPS_URL = "https://www.google.com/maps/search/?api=1&query={lat:.6f},{lon:.6f}"
+# Same format as the portal's "Udostępnij lokalizację" link; note longitude comes first.
+BDL_MAP_URL = "https://www.bdl.lasy.gov.pl/portal/mapy?location={lon:.6f},{lat:.6f}"
 
 
 @dataclass(frozen=True)
@@ -107,6 +109,11 @@ class ClassificationService:
     def current_map_url(self) -> str:
         tree = self.current_tree
         return GOOGLE_MAPS_URL.format(lat=tree.latitude, lon=tree.longitude)
+
+    @property
+    def current_bdl_url(self) -> str:
+        tree = self.current_tree
+        return BDL_MAP_URL.format(lat=tree.latitude, lon=tree.longitude)
 
     @property
     def is_complete(self) -> bool:
@@ -294,6 +301,7 @@ def test_current_map_url_follows_current_tree(tmp_path):
     assert service.current_map_url == "https://www.google.com/maps/search/?api=1&query=52.000000,21.000000"
     service.next_page(1)
     assert service.current_map_url == "https://www.google.com/maps/search/?api=1&query=54.000000,23.000000"
+    assert service.current_bdl_url == "https://www.bdl.lasy.gov.pl/portal/mapy?location=23.000000,54.000000"
 
 
 def test_find_report_pairs_in_directory_searches_by_csv(tmp_path):
