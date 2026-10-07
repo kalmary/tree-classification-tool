@@ -36,6 +36,11 @@ class ClassificationWindow(QMainWindow):
         self.class_input.setPlaceholderText("nr")
         self.class_input.setFixedWidth(60)
         self.status = QLabel()
+        self.map_link = QLabel()
+        self.map_link.setOpenExternalLinks(True)
+        self.map_link.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
+        # Keeps keyboard focus in the class number input.
+        self.map_link.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.previous_button = QPushButton("Previous")
         self.next_button = QPushButton("Next")
         self.save_quit_button = QPushButton("Save and Quit")
@@ -44,6 +49,7 @@ class ClassificationWindow(QMainWindow):
         navigation.addWidget(QLabel("Class:"))
         navigation.addWidget(self.class_input)
         navigation.addWidget(self.status, stretch=1)
+        navigation.addWidget(self.map_link)
         for button in (self.previous_button, self.next_button, self.save_quit_button):
             # Keeps keyboard focus in the class number input.
             button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -79,6 +85,7 @@ class ClassificationWindow(QMainWindow):
             f"{tree.source_tree_id} · tree {self.service.current_index + 1}/{self.service.total_pages}"
             f" · file {self._file_index + 1}/{len(self.services)}"
         )
+        self.map_link.setText(f'<a href="{self.service.current_map_url}">Google Maps</a>')
         self._update_controls()
 
     def _update_controls(self) -> None:
@@ -165,7 +172,7 @@ def _make_window(tmp_path, *files: list[int]) -> ClassificationWindow:
     services = []
     for file_number, labels in enumerate(files):
         pair = ReportPair(tmp_path / f"f{file_number}.pdf", tmp_path / f"f{file_number}.csv")
-        rows = [TreeLabel(i, 52.0, 21.0, 10.0, f"f{file_number}_{i}", label) for i, label in enumerate(labels)]
+        rows = [TreeLabel(i, 52.0 + file_number, 21.0 + i, 10.0, f"f{file_number}_{i}", label) for i, label in enumerate(labels)]
         CsvLabelStore().write_labels(rows, pair.csv_path)
         services.append(ClassificationService(StubPageReader(len(labels)), CsvLabelStore(), pair, label_names))
     return ClassificationWindow(services)
@@ -286,3 +293,16 @@ def test_enter_advances_only_with_selection_and_clears_input(tmp_path):
     assert _csv_labels(window) == [3, -2]
     assert window.service.current_index == 1
     assert window.class_input.text() == ""
+
+
+def test_map_link_points_to_current_tree(tmp_path):
+    window = _make_window(tmp_path, [-2, -2], [-2])
+    assert "query=52.000000,21.000000" in window.map_link.text()
+
+    window.label_buttons.button(1).click()
+    window.next_button.click()
+    assert "query=52.000000,22.000000" in window.map_link.text()
+
+    window.label_buttons.button(1).click()
+    window.next_button.click()
+    assert "query=53.000000,21.000000" in window.map_link.text()

@@ -10,6 +10,7 @@ from tree_classification.core.protocols import LabelStore, PageReader
 from tree_classification.services.preprocessing import UNCLASSIFIED_LABEL
 
 REPORT_SUFFIX = "_trees_report"
+GOOGLE_MAPS_URL = "https://www.google.com/maps/search/?api=1&query={lat:.6f},{lon:.6f}"
 
 
 @dataclass(frozen=True)
@@ -101,6 +102,11 @@ class ClassificationService:
     @property
     def current_tree(self) -> TreeLabel:
         return self._trees[self._index]
+
+    @property
+    def current_map_url(self) -> str:
+        tree = self.current_tree
+        return GOOGLE_MAPS_URL.format(lat=tree.latitude, lon=tree.longitude)
 
     @property
     def is_complete(self) -> bool:
@@ -275,6 +281,19 @@ def test_current_page_image_uses_current_index(tmp_path):
     service = _make_service(tmp_path, [1, -2])
 
     assert service.current_page_image()[0, 0, 0] == 1
+
+
+def test_current_map_url_follows_current_tree(tmp_path):
+    from tree_classification.reporting.csv_store import CsvLabelStore
+
+    pair = ReportPair(tmp_path / f"a{REPORT_SUFFIX}.pdf", tmp_path / f"a{REPORT_SUFFIX}.csv")
+    rows = [TreeLabel(0, 52.0, 21.0, 10.0, "a_0", -2), TreeLabel(1, 54.0, 23.0, 10.0, "a_1", -2)]
+    CsvLabelStore().write_labels(rows, pair.csv_path)
+    service = ClassificationService(_StubPageReader(2), CsvLabelStore(), pair, load_label_names(LABELS_JSON))
+
+    assert service.current_map_url == "https://www.google.com/maps/search/?api=1&query=52.000000,21.000000"
+    service.next_page(1)
+    assert service.current_map_url == "https://www.google.com/maps/search/?api=1&query=54.000000,23.000000"
 
 
 def test_find_report_pairs_in_directory_searches_by_csv(tmp_path):
