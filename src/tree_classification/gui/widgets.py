@@ -2,22 +2,23 @@ import numpy as np
 from numpy.typing import NDArray
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QImage, QPixmap
-from PySide6.QtWidgets import QButtonGroup, QLabel, QPushButton, QSizePolicy, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QButtonGroup, QGridLayout, QLabel, QPushButton, QSizePolicy, QWidget
 
 from tree_classification.services.classification import LabelName
 
 # Pixels lighter than this on every channel count as paper when trimming page margins.
 PAPER_THRESHOLD = 245
 TRIM_PADDING = 12
+LABEL_COLUMNS = 2
 
 LABEL_BUTTON_STYLE = """
 QPushButton {
     text-align: left;
-    padding: 4px 12px;
-    font-size: 14px;
-    border: 1px solid palette(mid);
+    padding: 6px 12px;
+    font-size: 13pt;
+    border: 1px solid rgba(128, 128, 128, 0.6);
     border-radius: 6px;
-    background-color: palette(button);
+    background-color: rgba(128, 128, 128, 0.12);
 }
 QPushButton:hover { border-color: palette(highlight); }
 QPushButton[candidate="true"] { border: 2px solid #7cb342; }
@@ -73,9 +74,9 @@ class PageViewer(QLabel):
 
 
 class LabelButtons(QWidget):
-    """One checkable button per label in a single column, one line each: code, Polish and Latin name.
-    At most one is selected.
+    """One checkable button per label: code and Polish name, Latin name below. At most one is selected.
 
+    Labels fill LABEL_COLUMNS columns top to bottom, so codes read in order down each column.
     Negative codes (-2, unclassified) go last, away from the labels used most.
     Clicking a different label emits `changed`; clicking the already selected one emits `confirmed`.
     """
@@ -85,21 +86,23 @@ class LabelButtons(QWidget):
 
     def __init__(self, label_names: dict[int, LabelName]):
         super().__init__()
-        layout = QVBoxLayout(self)
+        layout = QGridLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(4)
+        layout.setSpacing(6)
         self.setStyleSheet(LABEL_BUTTON_STYLE)
         self._group = QButtonGroup(self)
         self._group.setExclusive(True)
-        for code, name in sorted(label_names.items(), key=lambda item: (item[0] < 0, item[0])):
-            button = QPushButton(f"{code}: {name.polish} · {name.latin}")
+        ordered = sorted(label_names.items(), key=lambda item: (item[0] < 0, item[0]))
+        rows = -(-len(ordered) // LABEL_COLUMNS)
+        for position, (code, name) in enumerate(ordered):
+            button = QPushButton(f"{code}: {name.polish}\n{name.latin}")
             button.setCheckable(True)
-            button.setMinimumHeight(36)
+            button.setMinimumHeight(54)
             # Keeps keyboard focus in the label input of the window.
             button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
             self._group.addButton(button, code)
-            layout.addWidget(button)
-        layout.addStretch(1)
+            layout.addWidget(button, position % rows, position // rows)
+        layout.setRowStretch(rows, 1)
         # Selection before the latest click; an exclusive group gives no way to tell a re-click apart.
         self._last: int | None = None
         self._group.idClicked.connect(self._on_clicked)
@@ -166,9 +169,9 @@ def test_label_buttons_show_code_polish_and_latin_names_with_negative_codes_last
     buttons = LabelButtons(_NAMES)
 
     assert {code: buttons.button(code).text() for code in _NAMES} == {
-        -2: "-2: Nieklasyfikowane · Unclassified",
-        0: "0: sosna · Pinus",
-        1: "1: świerk · Picea",
+        -2: "-2: Nieklasyfikowane\nUnclassified",
+        0: "0: sosna\nPinus",
+        1: "1: świerk\nPicea",
     }
     layout = buttons.layout()
     order = [layout.itemAt(i).widget().text().split(":")[0] for i in range(len(_NAMES))]

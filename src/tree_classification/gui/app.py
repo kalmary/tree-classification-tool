@@ -1,7 +1,6 @@
 import sys
 
 from PySide6.QtCore import QSignalBlocker, Qt
-from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
@@ -23,19 +22,31 @@ from tree_classification.services.preprocessing import UNCLASSIFIED_LABEL
 
 WINDOW_TITLE = "Klasyfikacja drzew"
 PAGE_DPI = 150
-PANEL_WIDTH = 400
+PANEL_WIDTH = 500
 
 FEEDBACK_COLORS = {"ok": "#43a047", "warn": "#f9a825", "error": "#e53935", "hint": "palette(mid)"}
 
+# Font sizes in pt, not px, so they follow the screen's DPI scaling.
 WINDOW_STYLE = """
 QPushButton#next { background-color: #2e7d32; color: white; font-weight: bold; border: 1px solid #2e7d32; }
-QPushButton#next:disabled { background-color: palette(button); color: palette(mid); border: 1px solid palette(mid); }
-QPushButton#navigation { background-color: palette(button); border: 1px solid palette(mid); }
+QPushButton#next:disabled {
+    background-color: rgba(128, 128, 128, 0.2); color: rgba(128, 128, 128, 0.9); border: 1px solid rgba(128, 128, 128, 0.6);
+}
+QPushButton#navigation { background-color: rgba(128, 128, 128, 0.12); border: 1px solid rgba(128, 128, 128, 0.6); }
 QPushButton#navigation:hover { border-color: palette(highlight); }
-QPushButton#navigation:disabled { color: palette(mid); }
-QPushButton#navigation, QPushButton#next { min-height: 40px; padding: 0 14px; border-radius: 6px; font-size: 14px; }
-QProgressBar { min-height: 20px; border-radius: 4px; text-align: center; }
-QProgressBar::chunk { background-color: #2e7d32; border-radius: 4px; }
+QPushButton#navigation:disabled { color: rgba(128, 128, 128, 0.7); }
+QPushButton#navigation, QPushButton#next { min-height: 48px; padding: 0 16px; border-radius: 6px; font-size: 14pt; }
+QProgressBar {
+    min-height: 32px; border: 1px solid rgba(128, 128, 128, 0.6); border-radius: 6px;
+    background-color: rgba(128, 128, 128, 0.15); text-align: center; font-size: 13pt; font-weight: bold;
+}
+QProgressBar::chunk { background-color: #2e7d32; border-radius: 5px; }
+QLabel#title { font-size: 18pt; font-weight: bold; }
+QLabel#subtitle { font-size: 12pt; }
+QLabel#links { font-size: 14pt; }
+QLabel#panelTitle { font-size: 14pt; font-weight: bold; }
+QLabel#feedback { font-size: 12pt; }
+QLineEdit#labelInput { font-size: 16pt; min-height: 48px; padding: 0 8px; }
 """
 
 
@@ -55,29 +66,26 @@ class ClassificationWindow(QMainWindow):
         self.setStyleSheet(WINDOW_STYLE)
 
         self.name_label = QLabel()
-        name_font = QFont()
-        name_font.setPointSize(16)
-        name_font.setBold(True)
-        self.name_label.setFont(name_font)
+        self.name_label.setObjectName("title")
         self.name_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.position_label = QLabel()
+        self.position_label.setObjectName("subtitle")
         self.map_link = QLabel()
+        self.map_link.setObjectName("links")
         self.map_link.setOpenExternalLinks(True)
         self.map_link.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
         # Keeps keyboard focus in the label input.
         self.map_link.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.progress = QProgressBar()
-        self.progress.setFixedWidth(280)
+        self.progress.setFixedWidth(460)
         self.progress.setFormat("sklasyfikowano %v / %m")
         self.viewer = PageViewer()
 
         self.class_input = QLineEdit()
         self.class_input.setPlaceholderText("numer lub nazwa, np. 5 / dąb / quercus")
-        self.class_input.setMinimumHeight(44)
-        input_font = QFont()
-        input_font.setPointSize(14)
-        self.class_input.setFont(input_font)
+        self.class_input.setObjectName("labelInput")
         self.feedback = QLabel()
+        self.feedback.setObjectName("feedback")
         self.feedback.setWordWrap(True)
         self.label_buttons = LabelButtons(services[0].label_names)
         self.previous_button = QPushButton("← Poprzednie")
@@ -107,16 +115,18 @@ class ClassificationWindow(QMainWindow):
         title.setSpacing(2)
         title.addWidget(self.name_label)
         title.addWidget(self.position_label)
+        title_widget = QWidget()
+        title_widget.setLayout(title)
+        links = QHBoxLayout()
+        links.addStretch(1)
+        links.addWidget(self.map_link)
+        links_widget = QWidget()
+        links_widget.setLayout(links)
+        # Equal stretch on both sides keeps the progress bar in the middle of the window.
         header = QHBoxLayout()
-        header.addLayout(title)
-        header.addStretch(1)
-        header.addWidget(self.map_link)
-        header.addSpacing(24)
+        header.addWidget(title_widget, stretch=1)
         header.addWidget(self.progress)
-
-        page_column = QVBoxLayout()
-        page_column.addLayout(header)
-        page_column.addWidget(self.viewer, stretch=1)
+        header.addWidget(links_widget, stretch=1)
 
         labels_scroll = QScrollArea()
         labels_scroll.setWidget(self.label_buttons)
@@ -128,21 +138,29 @@ class ClassificationWindow(QMainWindow):
         navigation.addWidget(self.next_button, stretch=1)
 
         panel = QVBoxLayout()
-        panel.addWidget(QLabel("<b>Etykieta</b>"))
+        panel_title = QLabel("Etykieta")
+        panel_title.setObjectName("panelTitle")
+        panel.addWidget(panel_title)
         panel.addWidget(self.class_input)
         panel.addWidget(self.feedback)
         panel.addWidget(labels_scroll, stretch=1)
         panel.addLayout(navigation)
         panel.addWidget(self.save_quit_button)
+        panel.setContentsMargins(0, 0, 0, 0)
         panel_widget = QWidget()
         panel_widget.setLayout(panel)
         panel_widget.setFixedWidth(PANEL_WIDTH)
 
-        root = QHBoxLayout()
+        body = QHBoxLayout()
+        body.setSpacing(16)
+        body.addWidget(self.viewer, stretch=1)
+        body.addWidget(panel_widget)
+
+        root = QVBoxLayout()
         root.setContentsMargins(12, 12, 12, 12)
-        root.setSpacing(16)
-        root.addLayout(page_column, stretch=1)
-        root.addWidget(panel_widget)
+        root.setSpacing(12)
+        root.addLayout(header)
+        root.addLayout(body, stretch=1)
         central = QWidget()
         central.setLayout(root)
         return central
