@@ -1,4 +1,6 @@
 import json
+import re
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -19,6 +21,19 @@ BDL_MAP_URL = "https://www.bdl.lasy.gov.pl/portal/mapy?location={lon:.6f},{lat:.
 class LabelName:
     latin: str
     polish: str
+
+
+@dataclass(frozen=True)
+class LabelMatch:
+    """`selected`: the code the typed text unambiguously means, if any. `candidates`: codes it may still mean."""
+    selected: int | None
+    candidates: list[int]
+
+
+def _fold(text: str) -> str:
+    """Lower case without Polish diacritics; "ł" has no Unicode decomposition, so it is mapped by hand."""
+    text = text.strip().casefold().replace("ł", "l")
+    return "".join(char for char in unicodedata.normalize("NFD", text) if not unicodedata.combining(char))
 
 
 @dataclass(frozen=True)
@@ -118,6 +133,38 @@ class ClassificationService:
     @property
     def is_complete(self) -> bool:
         return self.first_unclassified_index() is None
+
+    def classified_count(self) -> int:
+        return sum(tree.label != UNCLASSIFIED_LABEL for tree in self._trees)
+
+    def match_label(self, text: str) -> LabelMatch:
+        """Interprets text typed in the label field while it is being typed.
+
+        Digits match a code exactly ("1" is code 1 even when 10-17 exist) and list codes starting
+        with them as candidates. Other text matches part of a Latin or Polish name, ignoring case
+        and Polish diacritics ("dab" finds "dąb"); a single match, or a single exact name, is selected.
+        """
+        query = _fold(text)
+        if not query:
+            return LabelMatch(selected=None, candidates=[])
+        if re.fullmatch(r"-?\d+", query):
+            query = str(int(query))
+            candidates = [code for code in self.label_names if str(code).startswith(query)]
+            return LabelMatch(selected=int(query) if int(query) in self.label_names else None, candidates=candidates)
+
+        candidates = [
+            code for code, name in self.label_names.items()
+            if query in _fold(name.latin) or query in _fold(name.polish)
+        ]
+        exact = [code for code in candidates if query in (_fold(self.label_names[code].latin),
+                                                          _fold(self.label_names[code].polish))]
+        if len(exact) == 1:
+            selected = exact[0]
+        elif len(candidates) == 1:
+            selected = candidates[0]
+        else:
+            selected = None
+        return LabelMatch(selected=selected, candidates=candidates)
 
     def first_unclassified_index(self) -> int | None:
         return next((i for i, tree in enumerate(self._trees) if tree.label == UNCLASSIFIED_LABEL), None)
@@ -242,6 +289,43 @@ def test_resolve_label_rejects_unknown_input(tmp_path):
     for text in ("51", "sosnaa", "", "1.5"):
         with pytest.raises(ValueError):
             service.resolve_label(text)
+
+
+def test_match_label_by_code(tmp_path):
+    service = _make_service(tmp_path, [-2])
+
+    assert service.match_label("1") == LabelMatch(selected=1, candidates=[1, 10, 11, 12, 13, 14, 15, 16, 17])
+    assert service.match_label(" 12 ").selected == 12
+    assert service.match_label("01").selected == 1
+    assert service.match_label("-2").selected == -2
+    assert service.match_label("99") == LabelMatch(selected=None, candidates=[])
+
+
+def test_match_label_by_name_ignores_case_and_polish_characters(tmp_path):
+    service = _make_service(tmp_path, [-2])
+
+    assert service.match_label("dab").selected == 5
+    assert service.match_label("QUERC").selected == 5
+    assert service.match_label("glog").selected == 14
+    assert service.match_label("bledna").selected == 15
+    assert service.match_label("swierk").selected == 1
+
+
+def test_match_label_ambiguous_or_unknown_selects_nothing(tmp_path):
+    service = _make_service(tmp_path, [-2])
+
+    ambiguous = service.match_label("ab")
+    assert ambiguous.selected is None and sorted(ambiguous.candidates) == [2, 5, 9]  # Abies, dąb, grab
+    assert service.match_label("palma") == LabelMatch(selected=None, candidates=[])
+    assert service.match_label("") == LabelMatch(selected=None, candidates=[])
+
+
+def test_classified_count(tmp_path):
+    service = _make_service(tmp_path, [3, -2, -2])
+    assert service.classified_count() == 1
+
+    service.next_page(4)
+    assert service.classified_count() == 2
 
 
 def test_save_label_rejects_unknown_code(tmp_path):

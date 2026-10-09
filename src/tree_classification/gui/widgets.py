@@ -1,16 +1,49 @@
 import numpy as np
 from numpy.typing import NDArray
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QImage, QPixmap, QValidator
-from PySide6.QtWidgets import QButtonGroup, QGridLayout, QLabel, QPushButton, QSizePolicy, QWidget
+from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtWidgets import QButtonGroup, QLabel, QPushButton, QSizePolicy, QVBoxLayout, QWidget
 
 from tree_classification.services.classification import LabelName
 
-BUTTONS_PER_ROW = 6
+# Pixels lighter than this on every channel count as paper when trimming page margins.
+PAPER_THRESHOLD = 245
+TRIM_PADDING = 12
+
+LABEL_BUTTON_STYLE = """
+QPushButton {
+    text-align: left;
+    padding: 4px 12px;
+    font-size: 14px;
+    border: 1px solid palette(mid);
+    border-radius: 6px;
+    background-color: palette(button);
+}
+QPushButton:hover { border-color: palette(highlight); }
+QPushButton[candidate="true"] { border: 2px solid #7cb342; }
+QPushButton[saved="true"] { border-left: 6px solid #43a047; }
+QPushButton:checked {
+    background-color: #2e7d32;
+    border-color: #2e7d32;
+    color: white;
+    font-weight: bold;
+}
+"""
+
+
+def trim_margins(image: NDArray[np.uint8], padding: int = TRIM_PADDING) -> NDArray[np.uint8]:
+    """Crops the white paper around the page content, keeping `padding` pixels of it."""
+    content = np.any(image < PAPER_THRESHOLD, axis=2)
+    rows, cols = np.flatnonzero(content.any(axis=1)), np.flatnonzero(content.any(axis=0))
+    if rows.size == 0:
+        return image
+    top, bottom = max(rows[0] - padding, 0), min(rows[-1] + padding + 1, image.shape[0])
+    left, right = max(cols[0] - padding, 0), min(cols[-1] + padding + 1, image.shape[1])
+    return image[top:bottom, left:right]
 
 
 class PageViewer(QLabel):
-    """Shows an RGB page image scaled to the widget size, keeping its aspect ratio."""
+    """Shows an RGB page image without its white margins, scaled to the widget, keeping its aspect ratio."""
 
     def __init__(self):
         super().__init__()
@@ -21,7 +54,7 @@ class PageViewer(QLabel):
 
     def set_image(self, image: NDArray[np.uint8]) -> None:
         """Takes an (H, W, 3) uint8 RGB array."""
-        image = np.ascontiguousarray(image)
+        image = np.ascontiguousarray(trim_margins(image))
         height, width, _ = image.shape
         # copy() detaches the QImage from the numpy buffer, which may be freed afterwards.
         qimage = QImage(image.data, width, height, 3 * width, QImage.Format.Format_RGB888).copy()
@@ -39,24 +72,11 @@ class PageViewer(QLabel):
             ))
 
 
-class LabelCodeValidator(QValidator):
-    """Accepts only label codes; text that can still grow into one (e.g. "-", "1") is intermediate."""
-
-    def __init__(self, codes, parent=None):
-        super().__init__(parent)
-        self._codes = {str(code) for code in codes}
-
-    def validate(self, text: str, pos: int):
-        if text in self._codes:
-            return QValidator.State.Acceptable, text, pos
-        if text == "" or any(code.startswith(text) for code in self._codes):
-            return QValidator.State.Intermediate, text, pos
-        return QValidator.State.Invalid, text, pos
-
-
 class LabelButtons(QWidget):
-    """One checkable button per label, showing its code, Polish and Latin name. At most one is selected.
+    """One checkable button per label in a single column, one line each: code, Polish and Latin name.
+    At most one is selected.
 
+    Negative codes (-2, unclassified) go last, away from the labels used most.
     Clicking a different label emits `changed`; clicking the already selected one emits `confirmed`.
     """
 
@@ -65,18 +85,21 @@ class LabelButtons(QWidget):
 
     def __init__(self, label_names: dict[int, LabelName]):
         super().__init__()
-        layout = QGridLayout(self)
-        # Most styles mark a checked button too faintly to see which label is selected.
-        self.setStyleSheet("QPushButton:checked { background-color: #2e7d32; color: white; font-weight: bold; }")
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+        self.setStyleSheet(LABEL_BUTTON_STYLE)
         self._group = QButtonGroup(self)
         self._group.setExclusive(True)
-        for position, (code, name) in enumerate(label_names.items()):
-            button = QPushButton(f"{code}: {name.polish}\n{name.latin}")
+        for code, name in sorted(label_names.items(), key=lambda item: (item[0] < 0, item[0])):
+            button = QPushButton(f"{code}: {name.polish} · {name.latin}")
             button.setCheckable(True)
-            # Keeps keyboard focus in the class number input of the window.
+            button.setMinimumHeight(36)
+            # Keeps keyboard focus in the label input of the window.
             button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
             self._group.addButton(button, code)
-            layout.addWidget(button, *divmod(position, BUTTONS_PER_ROW))
+            layout.addWidget(button)
+        layout.addStretch(1)
         # Selection before the latest click; an exclusive group gives no way to tell a re-click apart.
         self._last: int | None = None
         self._group.idClicked.connect(self._on_clicked)
@@ -106,6 +129,24 @@ class LabelButtons(QWidget):
             self._group.button(code).setChecked(True)
         self._last = code
 
+    def set_candidates(self, codes: list[int]) -> None:
+        """Outlines the labels the typed text may still mean."""
+        self._mark("candidate", set(codes))
+
+    def set_saved(self, code: int | None) -> None:
+        """Marks the label already stored in the CSV for the current tree."""
+        self._mark("saved", set() if code is None else {code})
+
+    def is_marked(self, code: int, mark: str) -> bool:
+        return bool(self._group.button(code).property(mark))
+
+    def _mark(self, mark: str, codes: set[int]) -> None:
+        for button in self._group.buttons():
+            button.setProperty(mark, self._group.id(button) in codes)
+            # Qt applies property-based style rules only after the style is re-polished.
+            button.style().unpolish(button)
+            button.style().polish(button)
+
 
 # --- Tests ---
 def _qapp():
@@ -120,15 +161,18 @@ def _qapp():
 _NAMES = {-2: LabelName("Unclassified", "Nieklasyfikowane"), 0: LabelName("Pinus", "sosna"), 1: LabelName("Picea", "świerk")}
 
 
-def test_label_buttons_show_code_polish_and_latin_names():
+def test_label_buttons_show_code_polish_and_latin_names_with_negative_codes_last():
     _qapp()
     buttons = LabelButtons(_NAMES)
 
     assert {code: buttons.button(code).text() for code in _NAMES} == {
-        -2: "-2: Nieklasyfikowane\nUnclassified",
-        0: "0: sosna\nPinus",
-        1: "1: świerk\nPicea",
+        -2: "-2: Nieklasyfikowane · Unclassified",
+        0: "0: sosna · Pinus",
+        1: "1: świerk · Picea",
     }
+    layout = buttons.layout()
+    order = [layout.itemAt(i).widget().text().split(":")[0] for i in range(len(_NAMES))]
+    assert order == ["0", "1", "-2"]
     assert buttons.selected() is None
 
 
@@ -174,22 +218,31 @@ def test_clicking_selected_button_emits_confirmed():
     assert buttons.selected() == 0
 
 
-def test_label_code_validator_rejects_out_of_range_text():
+def test_candidate_and_saved_marks_replace_previous_ones():
     _qapp()
-    from PySide6.QtTest import QTest
-    from PySide6.QtWidgets import QLineEdit
+    buttons = LabelButtons(_NAMES)
 
-    typed = {}
-    for keys in ["17", "-2", "0", "18", "99", "-3", "-1", "100"]:
-        line = QLineEdit()
-        line.setValidator(LabelCodeValidator([-2, *range(18)]))
-        QTest.keyClicks(line, keys)
-        typed[keys] = line.text()
+    buttons.set_candidates([0, 1])
+    buttons.set_candidates([1])
+    buttons.set_saved(0)
 
-    assert typed == {"17": "17", "-2": "-2", "0": "0", "18": "1", "99": "9", "-3": "-", "-1": "-", "100": "10"}
+    assert [buttons.is_marked(code, "candidate") for code in (0, 1)] == [False, True]
+    assert buttons.is_marked(0, "saved") and not buttons.is_marked(1, "saved")
+    buttons.set_saved(None)
+    assert not buttons.is_marked(0, "saved")
 
 
-def test_page_viewer_scales_image_to_widget():
+def test_trim_margins_keeps_content_and_padding():
+    image = np.full((100, 200, 3), 255, dtype=np.uint8)
+    image[40:60, 50:150] = 0
+
+    trimmed = trim_margins(image, padding=5)
+
+    assert trimmed.shape == (30, 110, 3)
+    assert trim_margins(np.full((10, 10, 3), 255, dtype=np.uint8)).shape == (10, 10, 3)
+
+
+def test_page_viewer_scales_trimmed_image_to_widget():
     _qapp()
     viewer = PageViewer()
     viewer.resize(400, 400)
