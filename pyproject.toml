@@ -18,6 +18,10 @@ dependencies = [
     "torch>=2.14.1",
 ]
 
+[project.scripts]
+classify = "tree_classification.cli.classify:main"
+preprocess = "tree_classification.cli.preprocess:main"
+
 [dependency-groups]
 test = [
     "pytest>=9.1.1",
