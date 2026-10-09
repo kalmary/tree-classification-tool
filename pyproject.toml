@@ -31,4 +31,4 @@ build-backend = "hatchling.build"
 packages = ["src/tree_classification"]
 
 [tool.pytest.ini_options]
-python_files = ["*.py"]
+testpaths = ["tests"]

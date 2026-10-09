@@ -140,8 +140,8 @@ When instructions conflict, follow this order:
 ## Testing code
 
 - Unit and integration tests should be written and run for new code.
-- Unit tests for given functions should be written in their original files.
-- Integration tests should be written in the `tests/` directory, outside of `src/`.
+- Unit tests live in `tests/`, mirroring `src/tree_classification/` (e.g. `src/tree_classification/reporting/csv_store.py` -> `tests/reporting/test_csv_store.py`).
+- Integration tests live at the top level of `tests/`.
 - Always run tests, once new code is written.
 - If tests fail, explain why and identify the remaining uncertainty.
 - We use pytest for testing. No need for complex testing structure.
